@@ -1,123 +1,166 @@
-import { BaseAgent } from "../core/base-agent";
-import type { AgentConfig, Post, PostMetrics } from "../types";
-
 // ============================================================
-// Agent ⑤ フェッチャー — データ取得担当
+// Fetcher Agent — メトリクス取得
 // ============================================================
-// - 投稿済みのpostからThreads APIでメトリクスを取得
-// - 閲覧数・いいね・リプライ・リポストを記録
-// - アナリストの分析に必要なデータを蓄積
+// LLM不要。Threads Insights API で投稿指標を取得する。
 // ============================================================
 
-interface FetcherInput {
-  posts: Post[];          // メトリクス未取得 or 更新対象の投稿
-  accessToken: string;
-  userId: string;
+import {
+  loadPosts,
+  loadMetrics,
+  loadState,
+  saveState,
+  saveJSON,
+  PATHS,
+  log,
+} from "../core/store";
+import type { PostMetrics } from "../types";
+
+const THREADS_API = "https://graph.threads.net/v1.0";
+const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN!;
+const METRIC_FIELDS = "views,likes,replies,reposts,quotes";
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-interface FetcherOutput {
-  metrics: PostMetrics[];
-  errors: { postId: string; error: string }[];
-}
+/** Threads Insights API から1投稿分のメトリクスを取得 */
+async function fetchInsights(threadsPostId: string): Promise<PostMetrics | null> {
+  const url = `${THREADS_API}/${threadsPostId}/insights?metric=${METRIC_FIELDS}&access_token=${ACCESS_TOKEN}`;
+  const res = await fetch(url);
 
-const THREADS_API_BASE = "https://graph.threads.net/v1.0";
-
-export class FetcherAgent extends BaseAgent<FetcherInput, FetcherOutput> {
-  constructor() {
-    const config: AgentConfig = {
-      role: "fetcher",
-      name: "フェッチャー",
-      description: "Threads APIから投稿のメトリクスを取得する",
-      systemPrompt: "",
-      model: "claude-sonnet-4-20250514",
-      maxRetries: 3,
-      timeoutMs: 30000,
-    };
-    super(config);
+  if (res.status === 429) throw new Error("RATE_LIMITED");
+  if (!res.ok) {
+    const body = await res.text();
+    log(`fetcher: Insights API エラー (${res.status}): ${body}`);
+    return null;
   }
 
-  async execute(input: FetcherInput): Promise<FetcherOutput> {
-    const metrics: PostMetrics[] = [];
-    const errors: FetcherOutput["errors"] = [];
+  const json = (await res.json()) as {
+    data: { name: string; values: { value: number }[] }[];
+  };
 
-    for (const post of input.posts) {
-      if (!post.threadsPostId) {
-        errors.push({ postId: post.id, error: "No Threads post ID" });
-        continue;
+  // レスポンスパース
+  const m: Record<string, number> = {};
+  for (const item of json.data) {
+    m[item.name] = item.values?.[0]?.value ?? 0;
+  }
+
+  const views = m.views ?? 0;
+  const likes = m.likes ?? 0;
+  const replies = m.replies ?? 0;
+  const reposts = m.reposts ?? 0;
+  const quotes = m.quotes ?? 0;
+  const engagementRate = views > 0
+    ? Math.round(((likes + replies + reposts + quotes) / views) * 10000) / 100
+    : 0;
+
+  return {
+    postId: "",  // 呼び出し元でセット
+    threadsPostId,
+    views,
+    likes,
+    replies,
+    reposts,
+    quotes,
+    engagementRate,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+async function main() {
+  log("fetcher 開始");
+
+  if (!ACCESS_TOKEN) {
+    throw new Error("THREADS_ACCESS_TOKEN が未設定");
+  }
+
+  const state = loadState();
+
+  if (state.killSwitch) {
+    log("fetcher: キルスイッチ有効 → スキップ");
+    return;
+  }
+
+  // posted かつ threadsPostId がある投稿を取得
+  const posts = loadPosts();
+  const postedPosts = posts.filter((p) => p.status === "posted" && p.threadsPostId);
+
+  // 既存メトリクスのIDセット
+  const existingMetrics = loadMetrics();
+  const existingIds = new Set(existingMetrics.map((m) => m.threadsPostId));
+
+  // まだメトリクスを取得していない投稿
+  const targets = postedPosts.filter((p) => !existingIds.has(p.threadsPostId!));
+
+  if (targets.length === 0) {
+    log("fetcher: 新規メトリクス取得対象なし");
+    state.lastRun.fetcher = new Date().toISOString();
+    saveState(state);
+    log("fetcher 完了");
+    return;
+  }
+
+  log(`fetcher: ${targets.length}件のメトリクスを取得`);
+
+  const newMetrics: PostMetrics[] = [];
+  let errorCount = 0;
+
+  for (const post of targets) {
+    try {
+      const metrics = await fetchInsights(post.threadsPostId!);
+      if (metrics) {
+        metrics.postId = post.id;
+        newMetrics.push(metrics);
+        log(`fetcher: ${post.id} → views=${metrics.views}, engagement=${metrics.engagementRate}%`);
       }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
 
-      try {
-        const data = await this.fetchMetrics(
-          post.threadsPostId,
-          input.accessToken
-        );
-
-        const views = data.views ?? 0;
-        const likes = data.likes ?? 0;
-        const replies = data.replies ?? 0;
-        const reposts = data.reposts ?? 0;
-        const quotes = data.quotes ?? 0;
-
-        metrics.push({
-          postId: post.id,
-          threadsPostId: post.threadsPostId,
-          views,
-          likes,
-          replies,
-          reposts,
-          quotes,
-          engagementRate: views > 0 ? (likes + replies + reposts) / views : 0,
-          fetchedAt: new Date().toISOString(),
-        });
-
-        // レートリミット対策
-        await new Promise((r) => setTimeout(r, 500));
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        errors.push({ postId: post.id, error: errMsg });
+      if (msg === "RATE_LIMITED") {
+        // 429 → 5秒待ってリトライ1回
+        log("fetcher: 429 レート制限 → 5秒バックオフ後リトライ");
+        await sleep(5000);
+        try {
+          const metrics = await fetchInsights(post.threadsPostId!);
+          if (metrics) {
+            metrics.postId = post.id;
+            newMetrics.push(metrics);
+            log(`fetcher: ${post.id} (リトライ成功) → views=${metrics.views}`);
+          }
+        } catch {
+          log(`fetcher: ${post.id} リトライも失敗 → スキップ`);
+          errorCount++;
+        }
+      } else {
+        log(`fetcher: ${post.id} 取得失敗 → ${msg}`);
+        errorCount++;
       }
     }
 
-    console.log(
-      `[フェッチャー] メトリクス取得: ${metrics.length}件 | エラー: ${errors.length}件`
-    );
-
-    return { metrics, errors };
+    // リクエスト間隔 500ms
+    await sleep(500);
   }
 
-  /**
-   * Threads APIからメトリクスを取得
-   */
-  private async fetchMetrics(
-    threadsPostId: string,
-    accessToken: string,
-    isRetry = false
-  ): Promise<Record<string, number>> {
-    const metricsToFetch = "views,likes,replies,reposts,quotes";
-    const url = `${THREADS_API_BASE}/${threadsPostId}/insights?metric=${metricsToFetch}&access_token=${accessToken}`;
-
-    const res = await fetch(url);
-
-    // レートリミット(429)の場合、バックオフして1回だけリトライ
-    if (res.status === 429 && !isRetry) {
-      await new Promise((r) => setTimeout(r, 5000));
-      return this.fetchMetrics(threadsPostId, accessToken, true);
-    }
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Threads Insights API failed: ${err}`);
-    }
-
-    const json = (await res.json()) as {
-      data: Array<{ name: string; values: Array<{ value: number }> }>;
-    };
-
-    const result: Record<string, number> = {};
-    for (const metric of json.data) {
-      result[metric.name] = metric.values?.[0]?.value ?? 0;
-    }
-
-    return result;
+  // メトリクス保存
+  if (newMetrics.length > 0) {
+    const allMetrics = [...existingMetrics, ...newMetrics];
+    saveJSON(PATHS.metrics, allMetrics);
+    log(`fetcher: ${newMetrics.length}件保存 (合計 ${allMetrics.length}件)`);
   }
+
+  // ステート更新
+  if (errorCount > 0) {
+    state.errorCounts.fetcher = (state.errorCounts.fetcher ?? 0) + 1;
+  } else {
+    state.errorCounts.fetcher = 0;
+  }
+
+  state.lastRun.fetcher = new Date().toISOString();
+  saveState(state);
+  log("fetcher 完了");
 }
+
+main().catch((e) => {
+  log(`fetcher エラー: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(1);
+});

@@ -1,14 +1,18 @@
 {
   "name": "threads-agents",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "scripts": {
-    "pipeline": "bun run src/pipeline.ts",
-    "post": "bun run src/pipeline.ts post",
-    "kill": "bun run src/pipeline.ts kill"
-  },
-  "dependencies": {
-    "@anthropic-ai/sdk": "^0.39.0"
+    "agent:research": "bun run src/agents/researcher.ts",
+    "agent:analyze": "bun run src/agents/analyst.ts",
+    "agent:write": "bun run src/agents/writer.ts",
+    "agent:post": "bun run src/agents/poster.ts",
+    "agent:fetch": "bun run src/agents/fetcher.ts",
+    "agent:supervise": "bun run src/agents/supervisor.ts",
+    "review": "bun run src/cli/review.ts",
+    "status": "bun run src/cli/status.ts",
+    "setup-cron": "bun run src/cli/setup-cron.ts",
+    "kill": "bun run src/cli/kill.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

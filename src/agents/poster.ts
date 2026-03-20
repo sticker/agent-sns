@@ -1,246 +1,263 @@
-import { BaseAgent } from "../core/base-agent";
-import type { AgentConfig, Post, ScheduleConfig, TimeSlot } from "../types";
-
 // ============================================================
-// Agent ④ ポスター — 投稿実行担当
+// Poster Agent — 投稿実行（cron用、1回で1件投稿）
 // ============================================================
-// - キューに入った投稿をThreads APIで実行
-// - タイムスロットに分散して投稿
-// - コメント誘導型 → 自己返信付き
-// - ツリー型 → 返信チェーン
-// - アフィリエイト → コメントにリンク配置
+// LLM不要。Threads API経由で queued 投稿を1件投稿する。
 // ============================================================
 
-interface PosterInput {
-  posts: Post[];
-  schedule: ScheduleConfig;
-  accessToken: string;
-  userId: string;
+import {
+  loadState,
+  saveState,
+  loadPosts,
+  loadQueue,
+  loadSchedule,
+  saveJSON,
+  PATHS,
+  log,
+} from "../core/store";
+import type { Post } from "../types";
+import { MAX_DAILY_POSTS } from "../types";
+
+const THREADS_API = "https://graph.threads.net/v1.0";
+const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN!;
+const USER_ID = process.env.THREADS_USER_ID!;
+const SLOT_TOLERANCE_MINUTES = 15;
+
+// --- ユーティリティ ---
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
-interface PosterOutput {
-  posted: { postId: string; threadsPostId: string; scheduledAt: string }[];
-  failed: { postId: string; error: string }[];
+function getJSTNow(): Date {
+  const now = new Date();
+  const jstStr = now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" });
+  return new Date(jstStr);
 }
 
-const THREADS_API_BASE = "https://graph.threads.net/v1.0";
-
-export class PosterAgent extends BaseAgent<PosterInput, PosterOutput> {
-  constructor() {
-    const config: AgentConfig = {
-      role: "poster",
-      name: "ポスター",
-      description: "キューの投稿をThreads APIでスケジュール投稿する",
-      systemPrompt: "",
-      model: "claude-sonnet-4-20250514",
-      maxRetries: 2,
-      timeoutMs: 30000,
-    };
-    super(config);
-  }
-
-  async execute(input: PosterInput): Promise<PosterOutput> {
-    const posted: PosterOutput["posted"] = [];
-    const failed: PosterOutput["failed"] = [];
-
-    // 投稿をタイムスロットに割り当て（過去のスロットをスキップ）
-    const now = new Date();
-    const assignments = this.assignToSlots(input.posts, input.schedule, now);
-
-    for (const { post, slot } of assignments) {
-      try {
-        // --- Step 1: メイン投稿 ---
-        const mainPostId = await this.createTextPost(
-          input.userId,
-          input.accessToken,
-          post.content
-        );
-
-        // --- Step 2: ツリー型の場合、返信チェーンを作成 ---
-        if (post.threadParts && post.threadParts.length > 0) {
-          let parentId = mainPostId;
-          for (const part of post.threadParts) {
-            parentId = await this.createReplyPost(
-              input.userId,
-              input.accessToken,
-              part,
-              parentId
-            );
-          }
-        }
-
-        // --- Step 3: コメント誘導型の自己返信 ---
-        if (post.commentReply) {
-          await this.createReplyPost(
-            input.userId,
-            input.accessToken,
-            post.commentReply,
-            mainPostId
-          );
-        }
-
-        // --- Step 4: アフィリエイトリンクの配置 ---
-        if (post.affiliateLink) {
-          await this.createReplyPost(
-            input.userId,
-            input.accessToken,
-            post.affiliateLink,
-            mainPostId
-          );
-        }
-
-        posted.push({
-          postId: post.id,
-          threadsPostId: mainPostId,
-          scheduledAt: this.formatSlotTime(slot),
-        });
-      } catch (error) {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        failed.push({ postId: post.id, error: errMsg });
-      }
-    }
-
-    console.log(
-      `[ポスター] 投稿完了: ${posted.length}件 | 失敗: ${failed.length}件`
-    );
-
-    return { posted, failed };
-  }
-
-  /**
-   * テキスト投稿を作成（Threads API 2-step: create → publish）
-   */
-  private async createTextPost(
-    userId: string,
-    accessToken: string,
-    text: string
-  ): Promise<string> {
-    // Step 1: メディアコンテナ作成
-    const createRes = await fetch(
-      `${THREADS_API_BASE}/${userId}/threads`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          media_type: "TEXT",
-          text,
-          access_token: accessToken,
-        }),
-      }
-    );
-
-    if (!createRes.ok) {
-      const err = await createRes.text();
-      throw new Error(`Threads API create failed: ${err}`);
-    }
-
-    const { id: containerId } = (await createRes.json()) as { id: string };
-
-    // Threads APIの推奨: コンテナ作成後に待機してから公開
-    await new Promise((r) => setTimeout(r, 3000));
-
-    // Step 2: 公開
-    const publishRes = await fetch(
-      `${THREADS_API_BASE}/${userId}/threads_publish`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          creation_id: containerId,
-          access_token: accessToken,
-        }),
-      }
-    );
-
-    if (!publishRes.ok) {
-      const err = await publishRes.text();
-      throw new Error(`Threads API publish failed: ${err}`);
-    }
-
-    const { id: postId } = (await publishRes.json()) as { id: string };
-    return postId;
-  }
-
-  /**
-   * 返信投稿を作成
-   */
-  private async createReplyPost(
-    userId: string,
-    accessToken: string,
-    text: string,
-    replyToId: string
-  ): Promise<string> {
-    const createRes = await fetch(
-      `${THREADS_API_BASE}/${userId}/threads`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          media_type: "TEXT",
-          text,
-          reply_to_id: replyToId,
-          access_token: accessToken,
-        }),
-      }
-    );
-
-    if (!createRes.ok) {
-      const err = await createRes.text();
-      throw new Error(`Threads API reply create failed: ${err}`);
-    }
-
-    const { id: containerId } = (await createRes.json()) as { id: string };
-
-    const publishRes = await fetch(
-      `${THREADS_API_BASE}/${userId}/threads_publish`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          creation_id: containerId,
-          access_token: accessToken,
-        }),
-      }
-    );
-
-    if (!publishRes.ok) {
-      const err = await publishRes.text();
-      throw new Error(`Threads API reply publish failed: ${err}`);
-    }
-
-    const { id: postId } = (await publishRes.json()) as { id: string };
-    return postId;
-  }
-
-  /**
-   * 投稿を未来のタイムスロットに割り当て（過去のスロットはスキップ）
-   */
-  private assignToSlots(
-    posts: Post[],
-    schedule: ScheduleConfig,
-    now: Date
-  ): { post: Post; slot: TimeSlot }[] {
-    // 現在時刻をJST（Asia/Tokyo）で取得
-    const jstNow = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Tokyo" })
-    );
-    const currentHour = jstNow.getHours();
-    const currentMinute = jstNow.getMinutes();
-
-    // 過去のスロットを除外
-    const futureSlots = schedule.slots.filter(
-      (slot) =>
-        slot.hour > currentHour ||
-        (slot.hour === currentHour && slot.minute > currentMinute)
-    );
-
-    return posts.slice(0, futureSlots.length).map((post, i) => ({
-      post,
-      slot: futureSlots[i],
-    }));
-  }
-
-  private formatSlotTime(slot: TimeSlot): string {
-    return `${String(slot.hour).padStart(2, "0")}:${String(slot.minute).padStart(2, "0")}`;
-  }
+function getTodayDateJST(): string {
+  const jst = getJSTNow();
+  const y = jst.getFullYear();
+  const m = String(jst.getMonth() + 1).padStart(2, "0");
+  const d = String(jst.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
 }
+
+// --- Threads API ---
+
+/** コンテナ作成 → 3秒待機 → 公開 の2ステップ投稿 */
+async function publishSinglePost(text: string, replyToId?: string): Promise<string> {
+  const createParams: Record<string, string> = {
+    media_type: "TEXT",
+    text,
+    access_token: ACCESS_TOKEN,
+  };
+  if (replyToId) {
+    createParams.reply_to_id = replyToId;
+  }
+
+  // Step 1: コンテナ作成
+  const createRes = await fetch(`${THREADS_API}/${USER_ID}/threads`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams(createParams),
+  });
+
+  if (createRes.status === 429) throw new Error("RATE_LIMITED");
+  if (!createRes.ok) {
+    const body = await createRes.text();
+    throw new Error(`コンテナ作成失敗 (${createRes.status}): ${body}`);
+  }
+
+  const { id: containerId } = (await createRes.json()) as { id: string };
+
+  // Step 2: 3秒待機（Threads API推奨）
+  await sleep(3000);
+
+  // Step 3: 公開
+  const publishRes = await fetch(`${THREADS_API}/${USER_ID}/threads_publish`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      creation_id: containerId,
+      access_token: ACCESS_TOKEN,
+    }),
+  });
+
+  if (publishRes.status === 429) throw new Error("RATE_LIMITED");
+  if (!publishRes.ok) {
+    const body = await publishRes.text();
+    throw new Error(`公開失敗 (${publishRes.status}): ${body}`);
+  }
+
+  const { id: postId } = (await publishRes.json()) as { id: string };
+  return postId;
+}
+
+/** スレッド投稿（threadParts を連鎖リプライで投稿） */
+async function publishThread(parts: string[]): Promise<string> {
+  let rootId = "";
+  let parentId = "";
+
+  for (let i = 0; i < parts.length; i++) {
+    const replyTo = i === 0 ? undefined : parentId;
+    const postId = await publishSinglePost(parts[i], replyTo);
+    if (i === 0) rootId = postId;
+    parentId = postId;
+    if (i < parts.length - 1) await sleep(1000);
+  }
+
+  return rootId;
+}
+
+/** コメントリプライ付き投稿（本文 → セルフリプライ） */
+async function publishWithCommentReply(
+  content: string,
+  commentReply: string,
+): Promise<string> {
+  const rootId = await publishSinglePost(content);
+  await sleep(1000);
+  await publishSinglePost(commentReply, rootId);
+  return rootId;
+}
+
+// --- スケジュールスロット判定 ---
+
+function isNearSlot(schedule: ReturnType<typeof loadSchedule>): boolean {
+  // スロット未設定 → 常に許可
+  if (schedule.slots.length === 0) return true;
+
+  const now = getJSTNow();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+  for (const slot of schedule.slots) {
+    const slotMinutes = slot.hour * 60 + slot.minute;
+    if (Math.abs(nowMinutes - slotMinutes) <= SLOT_TOLERANCE_MINUTES) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// --- メイン ---
+
+async function main() {
+  log("poster 開始");
+
+  if (!ACCESS_TOKEN || !USER_ID) {
+    throw new Error("THREADS_ACCESS_TOKEN / THREADS_USER_ID が未設定");
+  }
+
+  const state = loadState();
+
+  // キルスイッチ確認
+  if (state.killSwitch) {
+    log("poster: キルスイッチ有効 → スキップ");
+    return;
+  }
+
+  // 日付変更 → カウントリセット
+  const today = getTodayDateJST();
+  if (state.todayDate !== today) {
+    state.dailyPostCount = 0;
+    state.todayDate = today;
+    log(`poster: 日付変更 → カウントリセット (${today})`);
+  }
+
+  // 日次上限チェック
+  if (state.dailyPostCount >= MAX_DAILY_POSTS) {
+    log(`poster: 日次上限到達 (${state.dailyPostCount}/${MAX_DAILY_POSTS}) → スキップ`);
+    state.lastRun.poster = new Date().toISOString();
+    saveState(state);
+    return;
+  }
+
+  // スケジュールスロットチェック
+  const schedule = loadSchedule();
+  if (!isNearSlot(schedule)) {
+    log("poster: 現在時刻はスケジュールスロット外 → スキップ");
+    state.lastRun.poster = new Date().toISOString();
+    saveState(state);
+    return;
+  }
+
+  // キューから queued 投稿を1件取得（draft は対象外）
+  const queue = loadQueue();
+  const target = queue.find((p) => p.status === "queued");
+  if (!target) {
+    log("poster: キューに queued 投稿なし → スキップ");
+    state.lastRun.poster = new Date().toISOString();
+    saveState(state);
+    return;
+  }
+
+  log(`poster: 投稿実行 → ${target.id} (${target.pattern})`);
+
+  try {
+    let threadsPostId: string;
+
+    // アフィリエイトリンクがあればコンテンツに追記
+    let content = target.content;
+    if (target.affiliateLink) {
+      content += `\n\n${target.affiliateLink}`;
+    }
+
+    if (target.threadParts && target.threadParts.length > 0) {
+      // スレッド（連鎖リプライ）
+      threadsPostId = await publishThread(target.threadParts);
+    } else if (target.commentReply) {
+      // コメント誘導型（セルフリプライ付き）
+      threadsPostId = await publishWithCommentReply(content, target.commentReply);
+    } else {
+      // 通常の単発投稿
+      threadsPostId = await publishSinglePost(content);
+    }
+
+    // 投稿成功 → ステータス更新
+    const now = new Date().toISOString();
+    target.status = "posted";
+    target.postedAt = now;
+    target.threadsPostId = threadsPostId;
+
+    // posts.json 更新（既存なら上書き、なければ追加）
+    const posts = loadPosts();
+    const idx = posts.findIndex((p) => p.id === target.id);
+    if (idx >= 0) {
+      posts[idx] = target;
+    } else {
+      posts.push(target);
+    }
+    saveJSON(PATHS.posts, posts);
+
+    // queue.json から除去
+    const updatedQueue = queue.filter((p) => p.id !== target.id);
+    saveJSON(PATHS.queue, updatedQueue);
+
+    // ステート更新
+    state.dailyPostCount += 1;
+    state.errorCounts.poster = 0;
+
+    log(`poster: 投稿成功 → ${threadsPostId} (本日 ${state.dailyPostCount}件目)`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+
+    if (msg === "RATE_LIMITED") {
+      log("poster: 429 レート制限 → バックオフしてスキップ");
+    } else {
+      log(`poster: 投稿失敗 → ${msg}`);
+      target.status = "failed";
+      const updatedQueue = queue.map((p) => (p.id === target.id ? target : p));
+      saveJSON(PATHS.queue, updatedQueue);
+    }
+
+    state.errorCounts.poster = (state.errorCounts.poster ?? 0) + 1;
+  }
+
+  state.lastRun.poster = new Date().toISOString();
+  saveState(state);
+  log("poster 完了");
+}
+
+main().catch((e) => {
+  log(`poster エラー: ${e instanceof Error ? e.message : String(e)}`);
+  process.exit(1);
+});
