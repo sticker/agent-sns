@@ -230,12 +230,36 @@ ${content}
 
 上記の投稿を10項目で採点し、JSON形式で出力してください。`;
 
+  const qualityJsonSchema = {
+    type: "object",
+    properties: {
+      hookStrength: { type: "number" },
+      usefulness: { type: "number" },
+      specificity: { type: "number" },
+      tempo: { type: "number" },
+      personaMatch: { type: "number" },
+      uniqueness: { type: "number" },
+      emotionalTrigger: { type: "number" },
+      readability: { type: "number" },
+      ctaPower: { type: "number" },
+      platformFit: { type: "number" },
+      average: { type: "number" },
+      feedback: { type: "string" },
+    },
+    required: [
+      "hookStrength", "usefulness", "specificity", "tempo",
+      "personaMatch", "uniqueness", "emotionalTrigger", "readability",
+      "ctaPower", "platformFit", "average", "feedback",
+    ],
+  };
+
   try {
     const score = await callLLMJSON<QualityScore & { feedback?: string }>(
       prompt,
       {
         systemPrompt: REVIEWER_SYSTEM_PROMPT,
         model: "opus",
+        jsonSchema: qualityJsonSchema,
       }
     );
 
