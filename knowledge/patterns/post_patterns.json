@@ -1,0 +1,177 @@
+{
+  "version": "1.0",
+  "hookTemplates": {
+    "assertion": [
+      "○○を使ってない人、マジで損してる。",
+      "○○が最強だと思ってた。△△に出会うまでは。",
+      "○○、もうオワコンです。",
+      "これ言うと怒られるけど、○○は××だと思う。",
+      "○○を1ヶ月使い倒した結論。",
+      "正直、○○はもう不要です。理由を話します。",
+      "○○知らない人、今すぐ試して。人生変わるから。"
+    ],
+    "question": [
+      "○○使ってる人、ぶっちゃけどう？",
+      "○○と△△、結局どっちがいいの？",
+      "○○って本当に使えるの？正直に言います。",
+      "なんでみんな○○使わないの？不思議でしょうがない。",
+      "○○できる人とできない人、何が違うと思う？"
+    ],
+    "exposure": [
+      "○○の裏側、教えます。",
+      "○○が絶対言わないこと。",
+      "○○業界の人間だけど、正直に言う。",
+      "○○の闇、そろそろ話していい？",
+      "みんな○○って言うけど、実態はこうです。"
+    ],
+    "story": [
+      "○○したら、人生変わった話。",
+      "3ヶ月前の僕に言いたいこと。",
+      "○○に全振りした結果。",
+      "○○を辞めてから、全てが好転した。",
+      "年収が○○万上がった、たった1つの理由。"
+    ],
+    "list_intro": [
+      "○○な人の特徴、5つ。",
+      "○○するために必要なこと3選。",
+      "絶対やってはいけない○○、7つ。",
+      "知らないと損する○○リスト。",
+      "○○ランキング、本音で作った。"
+    ],
+    "hot_take": [
+      "賛否あると思うけど、○○は××だと思ってる。",
+      "○○について、みんな勘違いしてると思う。",
+      "これ言うと炎上しそうだけど。",
+      "○○は過大評価されてる。理由を3つ話す。",
+      "業界の人に怒られそうだけど、○○は△△です。"
+    ]
+  },
+  "patterns": {
+    "short_statement": {
+      "name": "短文完結（断言型）",
+      "description": "1〜3行で強い主張を打ち出す。インパクト重視。",
+      "structure": "フック（断言） + 理由 or 補足（1〜2行）",
+      "example": "Claude Code、マジでヤバい。\n\nファイル操作もコマンド実行も全部AIがやってくれる。\n「AIに考えてもらう」じゃなくて「AIに働いてもらう」時代が来た。",
+      "maxLength": 300,
+      "threadParts": 1
+    },
+    "short_question": {
+      "name": "短文完結（問いかけ型）",
+      "description": "質問でコメントを誘う。共感を引き出す。",
+      "structure": "フック（問いかけ） + 自分の意見 or 背景",
+      "example": "ChatGPTとClaude、結局どっち使ってる？\n\n僕は用途で完全に分けてる。\n雑談・ブレストはGPT、長文・分析はClaude。",
+      "maxLength": 300,
+      "threadParts": 1
+    },
+    "short_exposure": {
+      "name": "短文完結（暴露系）",
+      "description": "「実は…」系。好奇心を刺激する。",
+      "structure": "フック（暴露・裏話） + 事実 + インパクトある締め",
+      "maxLength": 300,
+      "threadParts": 1
+    },
+    "demand_check": {
+      "name": "需要確認型",
+      "description": "「これ需要ある？」で反応を見る。低リスクで高エンゲージメント。",
+      "structure": "「○○の△△、まとめたら需要ある？」+ 簡単な内容説明",
+      "maxLength": 200,
+      "threadParts": 1
+    },
+    "list_3": {
+      "name": "リスト型（3選）",
+      "description": "3つのポイントで情報を整理。読みやすくて保存されやすい。",
+      "structure": "フック + ①②③ + 締め",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "list_5": {
+      "name": "リスト型（5選）",
+      "structure": "フック + ①②③④⑤ + 締め",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "list_7": {
+      "name": "リスト型（7選）",
+      "structure": "フック + ①〜⑦（ツリーで展開も可） + 締め",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "comparison": {
+      "name": "比較型",
+      "description": "AとBを対比。選択を迷ってる人に刺さる。",
+      "structure": "フック（A vs B） + 比較ポイント + 結論",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "before_after": {
+      "name": "ビフォーアフター型",
+      "description": "変化のストーリー。共感と希望を同時に生む。",
+      "structure": "Before状態 → きっかけ → After状態",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "myth_busting": {
+      "name": "常識破壊型",
+      "description": "「実は違う」で注目を集める。議論を生みやすい。",
+      "structure": "常識の提示 →「でも実は…」→ 真実 + 根拠",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "comment_bait": {
+      "name": "コメント誘導型",
+      "description": "本文で興味を引き、コメント欄に続きを書く。",
+      "structure": "本文（伏せ情報あり） + 自己返信で回答/リンク",
+      "maxLength": 300,
+      "threadParts": 1,
+      "requiresCommentReply": true
+    },
+    "thread_story": {
+      "name": "ツリー展開型（ストーリー）",
+      "description": "複数投稿で深いストーリーを語る。",
+      "structure": "1投目（フック）→ 2投目（展開）→ 3投目（結論/学び）",
+      "maxLength": 400,
+      "threadParts": 3
+    },
+    "thread_tips": {
+      "name": "ツリー展開型（Tips連投）",
+      "description": "テーマに沿ったTipsをツリーで連投。",
+      "structure": "1投目（テーマ提示）→ 2〜4投目（各Tip詳細）",
+      "maxLength": 400,
+      "threadParts": 4
+    },
+    "hot_take": {
+      "name": "持論展開型",
+      "description": "独自の見解を堂々と主張。議論を生む。",
+      "structure": "フック（持論） + 理由/根拠 + 結論の再強調",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "news_react": {
+      "name": "ニュースリアクション型",
+      "description": "最新ニュースに即座に反応。速報性が武器。",
+      "structure": "ニュース要約（1行） + 独自の解釈/影響分析",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "tool_review": {
+      "name": "ツール紹介型",
+      "description": "AIツールの実体験レビュー。具体的で実用的。",
+      "structure": "ツール名 + 何ができるか + 使ってみた感想 + おすすめ度",
+      "maxLength": 500,
+      "threadParts": 1
+    },
+    "tutorial_mini": {
+      "name": "ミニチュートリアル型",
+      "description": "「○○のやり方」を簡潔にまとめる。保存率が高い。",
+      "structure": "「○○する方法」 + 手順3〜5ステップ + 補足",
+      "maxLength": 500,
+      "threadParts": 1
+    }
+  },
+  "rotationRules": {
+    "maxConsecutiveSamePattern": 2,
+    "maxConsecutiveSameTheme": 3,
+    "recentPatternsToAvoid": 3,
+    "minPatternVariety_per10": 5
+  }
+}

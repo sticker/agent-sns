@@ -1,0 +1,17 @@
+{
+  "name": "threads-agents",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "pipeline": "bun run src/pipeline.ts",
+    "post": "bun run src/pipeline.ts post",
+    "kill": "bun run src/pipeline.ts kill"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.7.0"
+  }
+}

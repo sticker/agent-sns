@@ -1,0 +1,108 @@
+{
+  "genre": "ai_tech",
+  "version": "1.0",
+  "themes": [
+    {
+      "id": "ai_tools",
+      "name": "AIツール活用",
+      "description": "ChatGPT, Claude, Gemini等の実践的な使い方",
+      "priority": 5,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_tools_chatgpt", "name": "ChatGPT活用術", "description": "ChatGPTの実践的な使い方とTips", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_tools_claude", "name": "Claude活用術", "description": "Claudeの特徴を活かした活用テクニック", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_tools_gemini", "name": "Gemini活用術", "description": "Google Geminiの使いこなし方", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_tools_comparison", "name": "AIツール比較", "description": "主要AIツールの機能・性能比較", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_tools_hidden", "name": "知られてないAIツール", "description": "まだ知名度の低い便利なAIツールの紹介", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_tools_workflow", "name": "AIツール連携・ワークフロー", "description": "複数AIツールを組み合わせた効率的なワークフロー", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "prompt_eng",
+      "name": "プロンプトエンジニアリング",
+      "description": "AIへの指示の出し方、テクニック",
+      "priority": 5,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "prompt_basics", "name": "プロンプトの基本", "description": "プロンプト作成の基礎知識と考え方", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "prompt_advanced", "name": "上級プロンプト技法", "description": "Chain of Thought等の高度なプロンプト手法", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "prompt_templates", "name": "コピペで使えるプロンプト集", "description": "すぐに使える実用的なプロンプトテンプレート", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "prompt_mistakes", "name": "プロンプトのNG例", "description": "やりがちなプロンプトの失敗パターンと改善法", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "ai_business",
+      "name": "AIで稼ぐ・副業",
+      "description": "AIを活用した収益化の具体的手法",
+      "priority": 5,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_biz_freelance", "name": "AIフリーランス", "description": "AIスキルを活かしたフリーランスの働き方", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_biz_automation", "name": "AI自動化で不労所得", "description": "AIによる自動化で収益を得る仕組みづくり", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_biz_content", "name": "AIコンテンツビジネス", "description": "AIを活用したコンテンツ制作・販売ビジネス", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_biz_sidejob", "name": "AI副業の始め方", "description": "初心者向けAI副業のステップガイド", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_biz_tools_sell", "name": "AIツール・テンプレ販売", "description": "AIツールやテンプレートの作成・販売手法", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "ai_coding",
+      "name": "AIコーディング",
+      "description": "Cursor, Claude Code, GitHub Copilot等を使った開発",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_code_cursor", "name": "Cursor活用", "description": "Cursorエディタの便利な使い方と設定", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_code_claude_code", "name": "Claude Code活用", "description": "Claude Codeによる効率的な開発手法", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_code_copilot", "name": "GitHub Copilot活用", "description": "GitHub Copilotを使ったコーディング効率化", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_code_nocode", "name": "ノーコード × AI", "description": "ノーコードツールとAIの組み合わせ活用", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_code_vibe", "name": "バイブコーディング", "description": "AIに自然言語で指示して開発する新スタイル", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "ai_news",
+      "name": "AI最新ニュース",
+      "description": "AI業界の最新動向、新サービス、アップデート",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_news_release", "name": "新サービス・リリース", "description": "新しいAIサービスやプロダクトのリリース情報", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_news_update", "name": "既存ツールのアップデート", "description": "既存AIツールの機能追加・改善情報", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_news_trend", "name": "AI業界トレンド", "description": "AI業界全体の動向と注目トレンド", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_news_regulation", "name": "AI規制・法律", "description": "AI関連の法規制や政策の動向", "priority": 2, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "ai_lifestyle",
+      "name": "AI × 生活効率化",
+      "description": "日常生活でのAI活用、時短、ライフハック",
+      "priority": 3,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_life_writing", "name": "AI × ライティング", "description": "AIを活用した文章作成・編集テクニック", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_life_learning", "name": "AI × 学習・勉強", "description": "AIを使った効率的な学習方法", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_life_image", "name": "AI × 画像生成", "description": "AI画像生成ツールの使い方とコツ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_life_daily", "name": "AI × 日常タスク", "description": "日常の雑務をAIで効率化する方法", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "ai_mindset",
+      "name": "AI時代のマインドセット",
+      "description": "AIとの向き合い方、キャリア、思考法",
+      "priority": 3,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "ai_mind_career", "name": "AI時代のキャリア戦略", "description": "AI時代に求められるキャリア設計と戦略", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_mind_skill", "name": "AIに代替されないスキル", "description": "AI時代に価値が高まる人間固有のスキル", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_mind_philosophy", "name": "AI共存の考え方", "description": "AIと人間が共存するための思考法", "priority": 2, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "ai_mind_hot_take", "name": "AI持論・ポジショントーク", "description": "AIに関する独自の見解や主張", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    }
+  ]
+}

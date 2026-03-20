@@ -1,0 +1,53 @@
+{
+  "system": {
+    "name": "Threads AI Agent System",
+    "version": "1.0.0",
+    "genre": "ai_tech"
+  },
+  "api": {
+    "llm": {
+      "provider": "anthropic",
+      "model": "claude-sonnet-4-20250514",
+      "maxTokens": 4096,
+      "temperature": 0.8
+    },
+    "threads": {
+      "baseUrl": "https://graph.threads.net/v1.0",
+      "rateLimitPerHour": 25
+    }
+  },
+  "schedule": {
+    "timezone": "Asia/Tokyo",
+    "maxPostsPerDay": 10,
+    "minIntervalMinutes": 60,
+    "slots": [
+      { "hour": 7,  "minute": 30, "label": "朝の通勤帯" },
+      { "hour": 9,  "minute": 0,  "label": "始業後" },
+      { "hour": 11, "minute": 0,  "label": "午前ラスト" },
+      { "hour": 12, "minute": 30, "label": "昼休み" },
+      { "hour": 14, "minute": 30, "label": "午後1" },
+      { "hour": 16, "minute": 30, "label": "午後2" },
+      { "hour": 18, "minute": 30, "label": "退勤帯" },
+      { "hour": 20, "minute": 0,  "label": "ゴールデンタイム" },
+      { "hour": 22, "minute": 0,  "label": "夜の閲覧帯" },
+      { "hour": 23, "minute": 30, "label": "深夜帯" }
+    ]
+  },
+  "safety": {
+    "_note": "これらの値は types/index.ts の定数と同期すること",
+    "qualityThreshold": 7.0,
+    "similarityThreshold": 0.85,
+    "maxDailyPosts": 15,
+    "minPostIntervalMinutes": 60,
+    "maxConsecutiveErrors": 3,
+    "killSwitchEnabled": true,
+    "maxRetries": 2
+  },
+  "pipeline": {
+    "order": ["fetcher", "analyst", "researcher", "writer", "poster"],
+    "writerBatchSize": 10,
+    "researchItemsPerRun": 20,
+    "historyLookbackDays": 30,
+    "similarityCheckCount": 100
+  }
+}
