@@ -33,9 +33,9 @@ agent-sns/
 │   │   └── index.ts        # 全型定義
 │   └── pipeline.ts         # パイプライン（メインエントリ）
 ├── knowledge/              # ナレッジ（差し替えでジャンル変更可能）
-│   ├── persona/ai_tech.json
+│   ├── persona/life_hack.json
 │   ├── patterns/post_patterns.json
-│   └── themes/ai_tech_tree.json
+│   └── themes/life_hack_tree.json
 ├── config/system.json
 ├── data/                   # 実行時データ（自動生成）
 ├── package.json

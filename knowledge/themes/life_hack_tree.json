@@ -1,0 +1,107 @@
+{
+  "genre": "life_hack",
+  "version": "1.0",
+  "themes": [
+    {
+      "id": "kitchen_hack",
+      "name": "時短料理・自炊ハック",
+      "description": "面倒くさがりでも続く自炊テクニック、作り置き、調理家電活用",
+      "priority": 5,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "kitchen_timesave", "name": "時短テクニック", "description": "切り方・下ごしらえ・同時調理で調理時間を半減", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "kitchen_mealprep", "name": "作り置き・冷凍術", "description": "週末2時間で平日5日分。冷凍保存のコツ", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "kitchen_appliance", "name": "調理家電活用", "description": "電気圧力鍋・ホットクック・電子レンジの極限活用", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "kitchen_onepot", "name": "ワンパン・ワンポット飯", "description": "洗い物最小限の一品完結レシピ", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "kitchen_seasoning", "name": "調味料ハック", "description": "これだけ持ってればOKな調味料と万能ダレ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "money_hack",
+      "name": "節約・家計管理",
+      "description": "無理しない節約術、固定費削減、ふるさと納税、ポイント活用",
+      "priority": 5,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "money_fixedcost", "name": "固定費の見直し", "description": "格安SIM・保険・サブスク整理で月○万浮かす", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "money_furusato", "name": "ふるさと納税", "description": "ふるさと納税のおすすめ返礼品と活用テクニック", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "money_point", "name": "ポイント・キャッシュレス", "description": "ポイント二重取り、最強クレカの組み合わせ", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "money_budgeting", "name": "家計管理術", "description": "家計簿アプリ活用、先取り貯金、生活防衛資金", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "money_shopping", "name": "買い物ハック", "description": "まとめ買い・底値管理・セール攻略のコツ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "clean_organize",
+      "name": "掃除・収納・整理",
+      "description": "散らからない仕組み、ラクに綺麗を保つテクニック、断捨離",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "clean_routine", "name": "掃除ルーティン", "description": "毎日5分で部屋をキープする仕組み", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "clean_storage", "name": "収納テクニック", "description": "100均・ニトリ・無印の収納グッズ活用", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "clean_declutter", "name": "断捨離・ミニマリスト", "description": "物を減らして生活の質を上げるコツ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "clean_laundry", "name": "洗濯ハック", "description": "シワにならない干し方、部屋干し対策、時短洗濯術", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "sleep_health",
+      "name": "睡眠・疲労回復",
+      "description": "睡眠の質を上げる方法、疲れを取るコツ、体調管理",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "sleep_quality", "name": "睡眠の質を上げる", "description": "寝具選び・入眠ルーティン・光と温度のコントロール", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "sleep_recovery", "name": "疲労回復", "description": "入浴法・ストレッチ・昼寝のコツ", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "sleep_morning", "name": "朝の習慣", "description": "スッキリ起きるための朝ルーティン", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "sleep_supplement", "name": "サプリ・栄養管理", "description": "疲労回復に効くサプリと栄養素の基礎知識", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "desk_wfh",
+      "name": "デスク環境・在宅ワーク",
+      "description": "快適なデスク環境構築、在宅ワークの効率化、ガジェット",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "desk_setup", "name": "デスクセットアップ", "description": "モニター・チェア・デスクの選び方と配置", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "desk_gadget", "name": "便利ガジェット", "description": "QOLが上がるデスク周りのガジェット紹介", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "desk_productivity", "name": "集中力・生産性", "description": "ポモドーロ・タスク管理・環境音などの集中テクニック", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "desk_ergonomics", "name": "肩こり・腰痛対策", "description": "デスクワーカーの体の不調を予防するコツ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "daily_hack",
+      "name": "日常生活の小ワザ",
+      "description": "知っておくと地味に便利な生活の知恵、季節ネタ、100均活用",
+      "priority": 4,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "daily_100yen", "name": "100均活用術", "description": "ダイソー・セリア・キャンドゥの使えるアイテム", "priority": 5, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "daily_season", "name": "季節の知恵", "description": "梅雨対策・夏の暑さ対策・冬の乾燥対策など", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "daily_smartphone", "name": "スマホ活用術", "description": "iPhone・Androidの便利設定・時短アプリ", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "daily_lifetips", "name": "地味に便利なコツ", "description": "知ってるだけで得する日常の小ワザ集", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "daily_travel", "name": "旅行・外出ハック", "description": "パッキング術・ホテル選び・移動の裏ワザ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    },
+    {
+      "id": "mindset_habit",
+      "name": "習慣化・マインドセット",
+      "description": "良い習慣を続けるコツ、先延ばし対策、メンタル管理",
+      "priority": 3,
+      "postCount": 0,
+      "avgPerformance": 0,
+      "children": [
+        { "id": "mindset_routine", "name": "習慣化のコツ", "description": "三日坊主にならない仕組みづくり", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "mindset_procrastination", "name": "先延ばし対策", "description": "面倒なタスクを片付けるテクニック", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "mindset_stress", "name": "ストレス管理", "description": "仕事と生活のバランスを保つコツ", "priority": 3, "children": [], "postCount": 0, "avgPerformance": 0 },
+        { "id": "mindset_time", "name": "時間管理術", "description": "忙しい人のための時間の作り方", "priority": 4, "children": [], "postCount": 0, "avgPerformance": 0 }
+      ]
+    }
+  ]
+}

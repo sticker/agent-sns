@@ -38,9 +38,9 @@ export const PATHS = {
   insights: join(DATA_DIR, "insights.json"),
   state: join(DATA_DIR, "system_state.json"),
   config: join(CONFIG_DIR, "system.json"),
-  persona: join(KNOWLEDGE_DIR, "persona", "ai_tech.json"),
+  persona: join(KNOWLEDGE_DIR, "persona", "life_hack.json"),
   patterns: join(KNOWLEDGE_DIR, "patterns", "post_patterns.json"),
-  themes: join(KNOWLEDGE_DIR, "themes", "ai_tech_tree.json"),
+  themes: join(KNOWLEDGE_DIR, "themes", "life_hack_tree.json"),
 } as const;
 
 // --- 簡易ファイルロック（同時書き込み防止） ---
