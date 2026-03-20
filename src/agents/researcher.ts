@@ -17,6 +17,13 @@ import {
   saveJSON,
   PATHS,
 } from "../core/store";
+import {
+  loadMemory,
+  saveMemory,
+  formatMemoryForPrompt,
+  pruneMemory,
+  type AgentMemory,
+} from "../core/memory";
 import type { ResearchItem, ThemeNode } from "../types";
 
 // --- テーマツリーをフラット化 ---
@@ -86,6 +93,14 @@ async function main() {
     log("KILL SWITCH 有効。中止。");
     return;
   }
+
+  // メモリ読み込み（自己改善ループ）
+  const memory = loadMemory("researcher");
+  memory.stats.totalRuns++;
+  memory.stats.lastRunAt = new Date().toISOString();
+
+  // メモリをプロンプト注入用に変換
+  const memoryContext = formatMemoryForPrompt(memory);
 
   // データ読み込み
   const themes = loadThemes();
@@ -167,6 +182,7 @@ ${existingTitles || "（なし）"}
 
 ## 現在の日付
 ${new Date().toISOString().split("T")[0]}
+${memoryContext}
 
 JSON配列のみを返してください。`;
 
@@ -204,12 +220,118 @@ JSON配列のみを返してください。`;
 
   log(`リサーチアイテム${newItems.length}件を追加（合計${merged.length}件）`);
 
+  // 振り返り: リサーチの質と活用状況を分析
+  const updatedMemory = await reflectResearcher(newItems, existingResearch, posts, memory);
+  saveMemory("researcher", updatedMemory);
+
   // ステート更新
   state.lastRun.researcher = new Date().toISOString();
   saveState(state);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log(`Researcher 完了 (${elapsed}秒)`);
+}
+
+// --- 振り返り: リサーチアイテムの質と活用状況を分析 ---
+
+async function reflectResearcher(
+  newItems: ResearchItem[],
+  existingResearch: ResearchItem[],
+  posts: { theme: string; subTheme: string }[],
+  memory: AgentMemory
+): Promise<AgentMemory> {
+  // 既存リサーチの活用状況を集計
+  const usedItems = existingResearch.filter((r) => r.usedCount > 0);
+  const unusedItems = existingResearch.filter((r) => r.usedCount === 0);
+  const usedThemes = new Map<string, number>();
+  const unusedThemes = new Map<string, number>();
+  for (const item of usedItems) {
+    usedThemes.set(item.theme, (usedThemes.get(item.theme) ?? 0) + 1);
+  }
+  for (const item of unusedItems) {
+    unusedThemes.set(item.theme, (unusedThemes.get(item.theme) ?? 0) + 1);
+  }
+
+  const reflectionPrompt = `
+あなたはSNSリサーチャーの自己改善アドバイザーです。
+以下のリサーチ結果と活用状況を分析し、次回の改善点を抽出してください。
+
+# 今回の生成
+- 新規リサーチアイテム: ${newItems.length}件
+- テーマ分布: ${[...new Set(newItems.map((i) => i.theme))].join(", ")}
+
+# 既存リサーチの活用状況
+- 活用済み: ${usedItems.length}件
+- 未使用: ${unusedItems.length}件
+- 活用されやすいテーマ: ${[...usedThemes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t, c]) => `${t}(${c}件)`).join(", ") || "（データなし）"}
+- 活用されにくいテーマ: ${[...unusedThemes.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([t, c]) => `${t}(${c}件)`).join(", ") || "（データなし）"}
+
+# 投稿で実際に使われたテーマ
+${[...new Set(posts.slice(-50).map((p) => p.theme))].join(", ") || "（データなし）"}
+
+# 現在の学び
+${memory.learnings.map((l) => `- [${l.category}] ${l.insight} (id: ${l.id})`).join("\n") || "（まだなし）"}
+
+# 指示
+1. どのテーマ/タイプのリサーチが実際に活用されるか、1〜3件の学びを抽出
+2. 未使用アイテムが多いテーマの原因を分析
+3. リサーチアイテムの具体性・質について改善点を述べる
+
+JSON形式で出力:
+{
+  "newLearnings": [
+    {
+      "category": "theme|quality|pattern|process",
+      "insight": "具体的な学び",
+      "confidence": 0.7,
+      "evidence": "根拠"
+    }
+  ],
+  "updatedConfidences": [
+    { "learningId": "既存の学びのID", "newConfidence": 0.8, "reason": "理由" }
+  ]
+}`;
+
+  try {
+    const result = await callLLMJSON<{
+      newLearnings: { category: string; insight: string; confidence: number; evidence: string }[];
+      updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
+    }>(reflectionPrompt, {
+      systemPrompt: "あなたはSNSリサーチの品質改善アドバイザーです。データに基づいた具体的な改善提案をしてください。",
+      model: "haiku",
+    });
+
+    // 新しい学びを追加
+    const now = new Date().toISOString();
+    for (const learning of result.newLearnings) {
+      memory.learnings.push({
+        id: `learn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        category: learning.category,
+        insight: learning.insight,
+        confidence: learning.confidence,
+        evidence: learning.evidence,
+        createdAt: now,
+        appliedCount: 0,
+        effectiveScore: 0,
+      });
+    }
+
+    // 既存の学びの確信度を更新
+    for (const update of result.updatedConfidences) {
+      const existing = memory.learnings.find((l) => l.id === update.learningId);
+      if (existing) {
+        existing.confidence = update.newConfidence;
+      }
+    }
+
+    memory.lastReflection = now;
+    memory.stats.successfulRuns = (memory.stats.successfulRuns || 0) + 1;
+
+    return pruneMemory(memory);
+  } catch (e) {
+    log(`[リサーチャー] 振り返りでエラー（スキップ）: ${e instanceof Error ? e.message : String(e)}`);
+    return memory;
+  }
 }
 
 main().catch((e) => {

@@ -17,6 +17,13 @@ import {
   saveJSON,
   PATHS,
 } from "../core/store";
+import {
+  loadMemory,
+  saveMemory,
+  formatMemoryForPrompt,
+  pruneMemory,
+  type AgentMemory,
+} from "../core/memory";
 import type { AnalystInsight, Post, PostMetrics, PostPattern } from "../types";
 
 // --- 投稿 + メトリクスの紐付け型 ---
@@ -152,6 +159,14 @@ async function main() {
     return;
   }
 
+  // メモリ読み込み（自己改善ループ）
+  const memory = loadMemory("analyst");
+  memory.stats.totalRuns++;
+  memory.stats.lastRunAt = new Date().toISOString();
+
+  // メモリをプロンプト注入用に変換
+  const memoryContext = formatMemoryForPrompt(memory);
+
   // データ読み込み
   const posts = loadPosts();
   const metrics = loadMetrics();
@@ -167,6 +182,9 @@ async function main() {
     const defaultInsight = generateDefaultInsight();
     const allInsights = [...previousInsights, defaultInsight].slice(-10);
     saveJSON(PATHS.insights, allInsights);
+
+    // メモリ保存（データ不足時もrun記録は残す）
+    saveMemory("analyst", memory);
 
     state.lastRun.analyst = new Date().toISOString();
     saveState(state);
@@ -241,7 +259,8 @@ ${
 - 「もっと○○を増やせ」「△△は控えろ」のように具体的に
 - 数値に基づいた根拠を示す
 - IDは "insight_${today.replace(/-/g, "")}" にしてください
-- 今日は${today}です`;
+- 今日は${today}です
+${memoryContext}`;
 
   log(`分析対象: ${linked.length}件の投稿データ`);
 
@@ -263,12 +282,112 @@ ${
     `分析完了 | トップパターン: ${insight.topPatterns?.[0]?.pattern ?? "N/A"} | 推奨事項: ${insight.recommendations?.length ?? 0}件`
   );
 
+  // 振り返り: 過去の推奨事項の精度を分析
+  const updatedMemory = await reflectAnalyst(insight, previousInsights, linked, memory);
+  saveMemory("analyst", updatedMemory);
+
   // ステート更新
   state.lastRun.analyst = new Date().toISOString();
   saveState(state);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log(`Analyst 完了 (${elapsed}秒)`);
+}
+
+// --- 振り返り: 過去の予測・推奨の精度を分析 ---
+
+async function reflectAnalyst(
+  currentInsight: AnalystInsight,
+  previousInsights: AnalystInsight[],
+  linkedData: PostWithMetrics[],
+  memory: AgentMemory
+): Promise<AgentMemory> {
+  // 前回の推奨事項を取得
+  const lastInsight = previousInsights.length > 0
+    ? previousInsights[previousInsights.length - 1]
+    : null;
+
+  const reflectionPrompt = `
+あなたはSNS分析アナリストの自己改善アドバイザーです。
+過去の予測・推奨が正しかったかを検証し、分析精度を向上させる学びを抽出してください。
+
+# 今回の分析結果
+- トップパターン: ${currentInsight.topPatterns?.map((p) => `${p.pattern}(${p.avgEngagement})`).join(", ") || "N/A"}
+- 弱いパターン: ${currentInsight.weakPatterns?.map((p) => `${p.pattern}(${p.avgEngagement})`).join(", ") || "N/A"}
+- トレンドテーマ: ${currentInsight.trendingThemes?.join(", ") || "N/A"}
+- 推奨事項: ${currentInsight.recommendations?.join(" / ") || "N/A"}
+
+${lastInsight ? `# 前回の推奨事項（検証対象）
+- トップパターン: ${lastInsight.topPatterns?.map((p) => `${p.pattern}(${p.avgEngagement})`).join(", ") || "N/A"}
+- 推奨事項: ${lastInsight.recommendations?.join(" / ") || "N/A"}
+- トレンド予測: ${lastInsight.trendingThemes?.join(", ") || "N/A"}` : "（前回データなし）"}
+
+# 分析対象データ件数
+${linkedData.length}件
+
+# 現在の学び
+${memory.learnings.map((l) => `- [${l.category}] ${l.insight} (id: ${l.id})`).join("\n") || "（まだなし）"}
+
+# 指示
+1. 前回の予測・推奨は正確だったか？ 1〜3件の学びを抽出
+2. 分析の盲点（見落としがち観点）があれば指摘
+3. 次回の分析で重点的に見るべきポイント
+
+JSON形式で出力:
+{
+  "newLearnings": [
+    {
+      "category": "accuracy|pattern|theme|process",
+      "insight": "具体的な学び",
+      "confidence": 0.7,
+      "evidence": "根拠"
+    }
+  ],
+  "updatedConfidences": [
+    { "learningId": "既存の学びのID", "newConfidence": 0.8, "reason": "理由" }
+  ]
+}`;
+
+  try {
+    const result = await callLLMJSON<{
+      newLearnings: { category: string; insight: string; confidence: number; evidence: string }[];
+      updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
+    }>(reflectionPrompt, {
+      systemPrompt: "あなたはSNS分析の精度改善アドバイザーです。過去の予測と実績を比較し、分析の盲点を見つけてください。",
+      model: "haiku",
+    });
+
+    // 新しい学びを追加
+    const now = new Date().toISOString();
+    for (const learning of result.newLearnings) {
+      memory.learnings.push({
+        id: `learn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        category: learning.category,
+        insight: learning.insight,
+        confidence: learning.confidence,
+        evidence: learning.evidence,
+        createdAt: now,
+        appliedCount: 0,
+        effectiveScore: 0,
+      });
+    }
+
+    // 既存の学びの確信度を更新
+    for (const update of result.updatedConfidences) {
+      const existing = memory.learnings.find((l) => l.id === update.learningId);
+      if (existing) {
+        existing.confidence = update.newConfidence;
+      }
+    }
+
+    memory.lastReflection = now;
+    memory.stats.successfulRuns = (memory.stats.successfulRuns || 0) + 1;
+
+    return pruneMemory(memory);
+  } catch (e) {
+    log(`[アナリスト] 振り返りでエラー（スキップ）: ${e instanceof Error ? e.message : String(e)}`);
+    return memory;
+  }
 }
 
 main().catch((e) => {

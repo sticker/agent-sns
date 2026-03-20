@@ -29,6 +29,13 @@ import {
   pruneData,
   PATHS,
 } from "../core/store";
+import {
+  loadMemory,
+  saveMemory,
+  formatMemoryForPrompt,
+  pruneMemory,
+  type AgentMemory,
+} from "../core/memory";
 import type {
   Post,
   PostPattern,
@@ -321,6 +328,14 @@ async function main() {
   // データ整理
   pruneData();
 
+  // メモリ読み込み（自己改善ループ）
+  const memory = loadMemory("writer");
+  memory.stats.totalRuns++;
+  memory.stats.lastRunAt = new Date().toISOString();
+
+  // メモリをプロンプト注入用に変換
+  const memoryContext = formatMemoryForPrompt(memory);
+
   // データ読み込み
   const posts = loadPosts();
   const queue = loadQueue();
@@ -395,6 +410,7 @@ ${JSON.stringify(
 ${themeIsRepeating ? `- テーマ「${recentThemes[0]}」が${MAX_CONSECUTIVE_SAME_THEME}回連続中。必ず別テーマにすること` : ""}
 - 全て異なるパターン・テーマの組み合わせにすること
 - 生成本数: ${BATCH_SIZE}本
+${memoryContext}
 
 JSON形式で出力してください。`;
 
@@ -422,6 +438,7 @@ JSON形式で出力してください。`;
     rejectedByRotation: 0,
   };
   const acceptedPosts: Post[] = [];
+  const rejectedPosts: { post: Partial<Post>; reason: string }[] = [];
   const allRecentForCheck = [...recentPosts]; // ローテーション判定用（採用分を追加していく）
 
   for (let i = 0; i < raw.posts.length; i++) {
@@ -493,6 +510,7 @@ ${p.content}
     // 品質チェック最終判定
     if (qualityScore.average < QUALITY_THRESHOLD) {
       stats.rejectedByQuality++;
+      rejectedPosts.push({ post: { content: p.content, pattern: p.pattern, theme: p.theme }, reason: `品質不合格（${qualityScore.average} < ${QUALITY_THRESHOLD}、リトライ${retryCount}回後）` });
       log(
         `  品質不合格（${qualityScore.average} < ${QUALITY_THRESHOLD}、リトライ${retryCount}回後）`
       );
@@ -503,6 +521,7 @@ ${p.content}
     const similarity = checkSimilarity(p.content, allRecentForCheck);
     if (similarity > SIMILARITY_THRESHOLD) {
       stats.rejectedBySimilarity++;
+      rejectedPosts.push({ post: { content: p.content, pattern: p.pattern, theme: p.theme }, reason: `類似度超過（${similarity.toFixed(2)} > ${SIMILARITY_THRESHOLD}）` });
       log(
         `  類似度超過（${similarity.toFixed(2)} > ${SIMILARITY_THRESHOLD}）`
       );
@@ -518,6 +537,7 @@ ${p.content}
       allPatterns.every((pat) => pat === p.pattern)
     ) {
       stats.rejectedByRotation++;
+      rejectedPosts.push({ post: { content: p.content, pattern: p.pattern, theme: p.theme }, reason: `パターン「${p.pattern}」が3連続` });
       log(`  パターン「${p.pattern}」が3連続になるためスキップ`);
       continue;
     }
@@ -531,6 +551,7 @@ ${p.content}
       recentThemeList.every((t) => t === p.theme)
     ) {
       stats.rejectedByRotation++;
+      rejectedPosts.push({ post: { content: p.content, pattern: p.pattern, theme: p.theme }, reason: `テーマ「${p.theme}」が${MAX_CONSECUTIVE_SAME_THEME}連続` });
       log(
         `  テーマ「${p.theme}」が${MAX_CONSECUTIVE_SAME_THEME}連続になるためスキップ`
       );
@@ -589,12 +610,106 @@ ${p.content}
       `ローテNG:${stats.rejectedByRotation}`
   );
 
+  // 振り返り: 今回の結果を分析して学びを抽出
+  const updatedMemory = await reflectWriter(stats, acceptedPosts, rejectedPosts, memory);
+  saveMemory("writer", updatedMemory);
+
   // ステート更新
   state.lastRun.writer = new Date().toISOString();
   saveState(state);
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
   log(`Writer 完了 (${elapsed}秒)`);
+}
+
+// --- 振り返り: 実行結果から学びを抽出 ---
+
+async function reflectWriter(
+  stats: { generated: number; accepted: number; rejectedByQuality: number; rejectedBySimilarity: number; rejectedByRotation: number },
+  acceptedPosts: Post[],
+  rejectedPosts: { post: Partial<Post>; reason: string }[],
+  memory: AgentMemory
+): Promise<AgentMemory> {
+  const reflectionPrompt = `
+あなたはSNS投稿ライターの自己改善アドバイザーです。
+以下の実行結果を分析し、次回の改善点を抽出してください。
+
+# 今回の実行結果
+- 生成: ${stats.generated}件
+- 採用: ${stats.accepted}件
+- 品質NG: ${stats.rejectedByQuality}件
+- 類似NG: ${stats.rejectedBySimilarity}件
+- ローテNG: ${stats.rejectedByRotation}件
+
+# 採用された投稿のパターンとスコア
+${acceptedPosts.map((p) => `- ${p.pattern} (${p.theme}): スコア${p.qualityScore?.average ?? "N/A"}`).join("\n") || "（なし）"}
+
+# 棄却された投稿の理由
+${rejectedPosts.slice(0, 5).map((r) => `- ${r.reason}`).join("\n") || "（なし）"}
+
+# 現在の学び
+${memory.learnings.map((l) => `- [${l.category}] ${l.insight} (id: ${l.id})`).join("\n") || "（まだなし）"}
+
+# 指示
+1. 今回の結果から得られる具体的な学びを1〜3件抽出してください
+2. 既存の学びの中で、今回の結果で確信度が上下したものがあれば指摘してください
+3. 次回の投稿生成で具体的に改善すべき点を述べてください
+
+JSON形式で出力:
+{
+  "newLearnings": [
+    {
+      "category": "quality|pattern|theme|process",
+      "insight": "具体的な学び",
+      "confidence": 0.7,
+      "evidence": "根拠となる今回のデータ"
+    }
+  ],
+  "updatedConfidences": [
+    { "learningId": "既存の学びのID", "newConfidence": 0.8, "reason": "理由" }
+  ]
+}`;
+
+  try {
+    const result = await callLLMJSON<{
+      newLearnings: { category: string; insight: string; confidence: number; evidence: string }[];
+      updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
+    }>(reflectionPrompt, {
+      systemPrompt: "あなたはSNS投稿の品質改善アドバイザーです。データに基づいた具体的な改善提案をしてください。",
+      model: "haiku",
+    });
+
+    // 新しい学びを追加
+    const now = new Date().toISOString();
+    for (const learning of result.newLearnings) {
+      memory.learnings.push({
+        id: `learn_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        category: learning.category,
+        insight: learning.insight,
+        confidence: learning.confidence,
+        evidence: learning.evidence,
+        createdAt: now,
+        appliedCount: 0,
+        effectiveScore: 0,
+      });
+    }
+
+    // 既存の学びの確信度を更新
+    for (const update of result.updatedConfidences) {
+      const existing = memory.learnings.find((l) => l.id === update.learningId);
+      if (existing) {
+        existing.confidence = update.newConfidence;
+      }
+    }
+
+    memory.lastReflection = now;
+    memory.stats.successfulRuns = (memory.stats.successfulRuns || 0) + (stats.accepted > 0 ? 1 : 0);
+
+    return pruneMemory(memory);
+  } catch (e) {
+    log(`[ライター] 振り返りでエラー（スキップ）: ${e instanceof Error ? e.message : String(e)}`);
+    return memory;
+  }
 }
 
 main().catch((e) => {
