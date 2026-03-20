@@ -30,6 +30,7 @@ export async function callLLM(
     prompt,
     "--output-format", "json",
     "--max-turns", String(options.maxTurns ?? 1),
+    "--tools", "",  // ツール使用を無効化し、テキスト応答のみに制限
   ];
 
   if (options.systemPrompt) {
@@ -64,6 +65,10 @@ export async function callLLM(
 
   if (output.is_error) {
     throw new Error(`LLM error: ${output.result}`);
+  }
+
+  if (typeof output.result !== "string") {
+    throw new Error(`LLM応答のresultが文字列ではありません: ${JSON.stringify(output).slice(0, 300)}`);
   }
 
   return output.result;
