@@ -157,16 +157,21 @@ ${patternText}
 {
   "posts": [
     {
-      "content": "投稿本文",
+      "content": "投稿本文（これが単体で完結するメインの投稿）",
       "pattern": "パターンID",
       "theme": "テーマID",
       "subTheme": "サブテーマID",
       "hook": "1行目のテキスト",
-      "threadParts": ["パート1", "パート2"],
+      "threadParts": ["補足情報1", "補足情報2"],
       "commentReply": "コメント欄の自己返信（必要な場合のみ）"
     }
   ]
-}`;
+}
+
+## contentとthreadPartsの違い（重要）
+- content: メインの投稿本文。これだけで完結する内容にすること
+- threadParts: contentに対するスレッド返信として追加する補足情報。contentの内容を繰り返さず、具体例・データ・裏話・参考リンクなど付加価値のある情報を書く。不要なら空配列[]でよい
+- contentの内容をthreadPartsに分割コピーするのは絶対にNG`;
 }
 
 // --- 日本語対応の類似度チェック（Jaccard係数 + n-gram + Intl.Segmenter） ---
@@ -501,11 +506,12 @@ ${p.content}
 
 書き直した投稿をJSON形式で出力してください:
 {
-  "content": "書き直した投稿本文",
+  "content": "書き直した投稿本文（単体で完結する内容）",
   "hook": "1行目",
-  "threadParts": ["パート1"],
+  "threadParts": ["contentとは別の補足情報。不要なら空配列"],
   "commentReply": "自己返信（任意）"
-}`;
+}
+※ contentの内容をthreadPartsに繰り返すのはNG`;
 
       try {
         const rewritten = await callLLMJSON<{
