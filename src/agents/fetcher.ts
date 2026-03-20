@@ -16,7 +16,7 @@ import {
 import type { PostMetrics } from "../types";
 
 const THREADS_API = "https://graph.threads.net/v1.0";
-const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN!;
+const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN ?? "";
 const METRIC_FIELDS = "views,likes,replies,reposts,quotes";
 
 function sleep(ms: number): Promise<void> {

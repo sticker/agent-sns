@@ -7,7 +7,7 @@
   "api": {
     "llm": {
       "provider": "anthropic",
-      "model": "claude-sonnet-4-20250514",
+      "model": "claude-opus-4-6",
       "maxTokens": 4096,
       "temperature": 0.8
     },
@@ -43,8 +43,7 @@
     "killSwitchEnabled": true,
     "maxRetries": 2
   },
-  "pipeline": {
-    "order": ["fetcher", "analyst", "researcher", "writer", "poster"],
+  "agents": {
     "writerBatchSize": 10,
     "researchItemsPerRun": 20,
     "historyLookbackDays": 30,

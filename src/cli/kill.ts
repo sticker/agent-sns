@@ -28,7 +28,7 @@ function main(): void {
   console.log();
   console.log("  全エージェントの実行が停止されます。");
   console.log(
-    "  復旧するには data/system_state.json の killSwitch を false に設定してください。"
+    "  復旧するには: bun run agent:supervise -- --reset"
   );
   console.log();
 }

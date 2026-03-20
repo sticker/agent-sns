@@ -127,7 +127,7 @@ export interface PostMetrics {
   replies: number;
   reposts: number;
   quotes: number;
-  engagementRate: number;
+  engagementRate: number;         // エンゲージメント率 (%)
   fetchedAt: string;
 }
 

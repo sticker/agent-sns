@@ -322,23 +322,34 @@ function main(): void {
 }
 
 function saveResults(queue: Post[]): void {
-  saveJSON(PATHS.queue, queue);
-
-  // Also update posts.json for rejected ones (move from queue to history)
+  // rejected をhistoryに移動
   const posts = loadPosts();
   const rejected = queue.filter((p) => p.status === "rejected");
   for (const rp of rejected) {
-    if (!posts.find((p) => p.id === rp.id)) {
+    const existingIdx = posts.findIndex((p) => p.id === rp.id);
+    if (existingIdx >= 0) {
+      posts[existingIdx] = rp;
+    } else {
       posts.push(rp);
     }
   }
   saveJSON(PATHS.posts, posts);
 
-  // Remove rejected from queue
+  // 承認済みの投稿もhistoryを更新
+  const approved = queue.filter((p) => p.status === "queued" && p.reviewedAt);
+  for (const ap of approved) {
+    const existingIdx = posts.findIndex((p) => p.id === ap.id);
+    if (existingIdx >= 0) {
+      posts[existingIdx] = ap;
+    }
+  }
+  saveJSON(PATHS.posts, posts);
+
+  // キューからrejectedを除去して保存
   const cleaned = queue.filter((p) => p.status !== "rejected");
   saveJSON(PATHS.queue, cleaned);
 
-  log(`レビュー完了: キュー更新済み`);
+  log(`レビュー完了: 承認${approved.length}件, 却下${rejected.length}件`);
 }
 
 function printSummary(

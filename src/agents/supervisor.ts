@@ -91,7 +91,27 @@ function detectSystemPatterns(state: SystemState, queue: Post[], posts: Post[], 
 
   // パターン3: 投稿間隔の偏り（短時間に集中していないか）
   const postedRecent = posts.filter(p => p.status === "posted" && p.postedAt).slice(-10);
-  // TODO: クラスタ投稿の検出ロジックを追加
+  if (postedRecent.length >= 3) {
+    const timestamps = postedRecent.map(p => new Date(p.postedAt!).getTime()).sort((a, b) => a - b);
+    let clusterCount = 0;
+    for (let i = 1; i < timestamps.length; i++) {
+      if (timestamps[i] - timestamps[i - 1] < 30 * 60 * 1000) { // 30分以内
+        clusterCount++;
+      }
+    }
+    if (clusterCount >= 2) {
+      newLearnings.push({
+        id: `sys_${Date.now()}_cluster`,
+        category: "schedule",
+        insight: `投稿が短時間に集中している (30分以内の連続投稿${clusterCount}回)。投稿間隔の分散が必要`,
+        confidence: 0.7,
+        evidence: `直近${postedRecent.length}件の投稿タイムスタンプ分析`,
+        createdAt: now,
+        appliedCount: 0,
+        effectiveScore: 0,
+      });
+    }
+  }
 
   // パターン4: テーマの偏り
   const queuedThemes = queue.filter(p => p.status === "queued" || p.status === "draft").map(p => p.theme);

@@ -25,6 +25,7 @@ import {
   loadInsights,
   loadPersona,
   loadPatterns,
+  loadConfig,
   saveJSON,
   pruneData,
   PATHS,
@@ -52,7 +53,6 @@ import {
 // --- 定数 ---
 
 const MAX_QUALITY_RETRIES = 2;
-const BATCH_SIZE = 5;
 
 // --- 厳格レビュアーのシステムプロンプト ---
 
@@ -235,7 +235,7 @@ ${content}
       prompt,
       {
         systemPrompt: REVIEWER_SYSTEM_PROMPT,
-        model: "haiku",
+        model: "opus",
       }
     );
 
@@ -325,6 +325,10 @@ async function main() {
     return;
   }
 
+  // 設定読み込み
+  const config = loadConfig() as { agents?: { writerBatchSize?: number } };
+  const batchSize = config.agents?.writerBatchSize ?? 5;
+
   // データ整理
   pruneData();
 
@@ -381,7 +385,7 @@ async function main() {
   const writerSystemPrompt = buildWriterSystemPrompt(persona, patterns);
 
   // 生成プロンプト
-  const userPrompt = `以下の情報を元に${BATCH_SIZE}本の投稿を生成してください。
+  const userPrompt = `以下の情報を元に${batchSize}本の投稿を生成してください。
 
 # アナリストからのフィードバック
 ${JSON.stringify(latestInsight.recommendations, null, 2)}
@@ -409,16 +413,16 @@ ${JSON.stringify(
 - 直近で使ったパターン（避けること）: ${JSON.stringify(recentPatterns)}
 ${themeIsRepeating ? `- テーマ「${recentThemes[0]}」が${MAX_CONSECUTIVE_SAME_THEME}回連続中。必ず別テーマにすること` : ""}
 - 全て異なるパターン・テーマの組み合わせにすること
-- 生成本数: ${BATCH_SIZE}本
+- 生成本数: ${batchSize}本
 ${memoryContext}
 
 JSON形式で出力してください。`;
 
-  log(`投稿${BATCH_SIZE}本を生成開始`);
+  log(`投稿${batchSize}本を生成開始`);
 
   const raw = await callLLMJSON<{ posts: GeneratedPost[] }>(userPrompt, {
     systemPrompt: writerSystemPrompt,
-    model: "sonnet",
+    model: "opus",
   });
 
   if (!raw.posts || !Array.isArray(raw.posts) || raw.posts.length === 0) {
@@ -487,7 +491,7 @@ ${p.content}
           commentReply?: string;
         }>(feedbackPrompt, {
           systemPrompt: writerSystemPrompt,
-          model: "sonnet",
+          model: "opus",
         });
 
         p = {
@@ -594,9 +598,9 @@ ${p.content}
     saveJSON(PATHS.posts, [...currentPosts, ...acceptedPosts]);
 
     // 使用したリサーチアイテムのusedCountを更新
-    const usedThemes = new Set(acceptedPosts.map((p) => p.theme));
+    const usedSubThemes = new Set(acceptedPosts.map((p) => `${p.theme}:${p.subTheme}`));
     const updatedResearch = research.map((r) => {
-      if (usedThemes.has(r.theme)) {
+      if (usedSubThemes.has(`${r.theme}:${r.subTheme}`)) {
         return { ...r, usedCount: r.usedCount + 1 };
       }
       return r;
@@ -676,7 +680,7 @@ JSON形式で出力:
       updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
     }>(reflectionPrompt, {
       systemPrompt: "あなたはSNS投稿の品質改善アドバイザーです。データに基づいた具体的な改善提案をしてください。",
-      model: "haiku",
+      model: "opus",
     });
 
     // 新しい学びを追加

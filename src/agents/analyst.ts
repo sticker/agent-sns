@@ -266,7 +266,7 @@ ${memoryContext}`;
 
   const insight = await callLLMJSON<AnalystInsight>(userPrompt, {
     systemPrompt,
-    model: "sonnet",
+    model: "opus",
   });
 
   // createdAtが未設定の場合は補完
@@ -354,7 +354,7 @@ JSON形式で出力:
       updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
     }>(reflectionPrompt, {
       systemPrompt: "あなたはSNS分析の精度改善アドバイザーです。過去の予測と実績を比較し、分析の盲点を見つけてください。",
-      model: "haiku",
+      model: "opus",
     });
 
     // 新しい学びを追加

@@ -9,6 +9,7 @@ import {
   writeFileSync,
   mkdirSync,
   appendFileSync,
+  unlinkSync,
 } from "fs";
 import type {
   SystemState,
@@ -42,17 +43,58 @@ export const PATHS = {
   themes: join(KNOWLEDGE_DIR, "themes", "ai_tech_tree.json"),
 } as const;
 
+// --- 簡易ファイルロック（同時書き込み防止） ---
+
+function withFileLock<T>(lockPath: string, fn: () => T, timeoutMs = 5000): T {
+  const lockFile = lockPath + ".lock";
+  const start = Date.now();
+
+  // ロック取得を試みる
+  while (existsSync(lockFile)) {
+    // ロックファイルが古い場合（30秒以上）は強制解除
+    try {
+      const lockTime = parseInt(readFileSync(lockFile, "utf-8"), 10);
+      if (Date.now() - lockTime > 30000) {
+        unlinkSync(lockFile);
+        break;
+      }
+    } catch {
+      break; // ロックファイル読み取り失敗 → 再試行
+    }
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(`ファイルロックタイムアウト: ${lockPath}`);
+    }
+    // 50ms待機
+    Bun.sleepSync(50);
+  }
+
+  // ロック取得
+  writeFileSync(lockFile, String(Date.now()));
+  try {
+    return fn();
+  } finally {
+    try { unlinkSync(lockFile); } catch {}
+  }
+}
+
 // --- 汎用JSON読み書き ---
 
 export function loadJSON<T>(path: string, fallback: T): T {
   if (!existsSync(path)) return fallback;
-  return JSON.parse(readFileSync(path, "utf-8")) as T;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8")) as T;
+  } catch (e) {
+    console.error(`JSONパースエラー (${path}): ${(e as Error).message}`);
+    return fallback;
+  }
 }
 
 export function saveJSON(path: string, data: unknown): void {
   const dir = path.substring(0, path.lastIndexOf("/"));
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(path, JSON.stringify(data, null, 2));
+  withFileLock(path, () => {
+    writeFileSync(path, JSON.stringify(data, null, 2));
+  });
 }
 
 // --- 型付きデータアクセス ---

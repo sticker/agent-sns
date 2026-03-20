@@ -18,8 +18,8 @@ import type { Post } from "../types";
 import { MAX_DAILY_POSTS } from "../types";
 
 const THREADS_API = "https://graph.threads.net/v1.0";
-const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN!;
-const USER_ID = process.env.THREADS_USER_ID!;
+const ACCESS_TOKEN = process.env.THREADS_ACCESS_TOKEN ?? "";
+const USER_ID = process.env.THREADS_USER_ID ?? "";
 const SLOT_TOLERANCE_MINUTES = 15;
 
 // --- ユーティリティ ---
@@ -202,8 +202,8 @@ async function main() {
     }
 
     if (target.threadParts && target.threadParts.length > 0) {
-      // スレッド（連鎖リプライ）
-      threadsPostId = await publishThread(target.threadParts);
+      // スレッド: 本文を先頭に、threadPartsを連鎖リプライで投稿
+      threadsPostId = await publishThread([content, ...target.threadParts]);
     } else if (target.commentReply) {
       // コメント誘導型（セルフリプライ付き）
       threadsPostId = await publishWithCommentReply(content, target.commentReply);

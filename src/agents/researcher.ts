@@ -190,7 +190,7 @@ JSON配列のみを返してください。`;
 
   const items = await callLLMJSON<ResearchLLMItem[]>(userPrompt, {
     systemPrompt,
-    model: "sonnet",
+    model: "opus",
   });
 
   if (!Array.isArray(items) || items.length === 0) {
@@ -298,7 +298,7 @@ JSON形式で出力:
       updatedConfidences: { learningId: string; newConfidence: number; reason: string }[];
     }>(reflectionPrompt, {
       systemPrompt: "あなたはSNSリサーチの品質改善アドバイザーです。データに基づいた具体的な改善提案をしてください。",
-      model: "haiku",
+      model: "opus",
     });
 
     // 新しい学びを追加
