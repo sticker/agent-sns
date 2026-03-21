@@ -31,16 +31,20 @@ export async function callLLM(
     "-p",
     prompt,
     "--output-format", "json",
-    "--no-chrome",             // Chrome統合を無効化
-    "--strict-mcp-config",     // --mcp-config未指定時にMCPサーバーを読み込まない
+    "--no-chrome",
+    "--strict-mcp-config",
+    "--max-turns", "1",
   ];
 
-  args.push("--max-turns", String(options.maxTurns ?? 1));
-  args.push("--tools", "");  // ビルトインツール使用を無効化
+  // ツール使用を完全に無効化（ビルトイン + MCP）
+  args.push("--allowedTools", "");
 
-  if (options.systemPrompt) {
-    args.push("--append-system-prompt", options.systemPrompt);
-  }
+  const fullSystemPrompt = [
+    options.systemPrompt,
+    "重要: ツールは一切使用しないでください。ファイルの読み取りや検索は不要です。指示された形式のJSONのみを出力してください。",
+  ].filter(Boolean).join("\n\n");
+
+  args.push("--append-system-prompt", fullSystemPrompt);
 
   if (options.model) {
     args.push("--model", options.model);
@@ -141,13 +145,19 @@ async function callLLMStructured<T>(
     "--output-format", "json",
     "--no-chrome",
     "--strict-mcp-config",
-    "--max-turns", String(options.maxTurns ?? 2),
+    "--max-turns", "1",
     "--json-schema", JSON.stringify(options.jsonSchema),
   ];
 
-  if (options.systemPrompt) {
-    args.push("--append-system-prompt", options.systemPrompt);
-  }
+  // ツール使用を完全に無効化
+  args.push("--allowedTools", "");
+
+  const fullSystemPrompt = [
+    options.systemPrompt,
+    "重要: ツールは一切使用しないでください。指示された形式のJSONのみを出力してください。",
+  ].filter(Boolean).join("\n\n");
+
+  args.push("--append-system-prompt", fullSystemPrompt);
 
   if (options.model) {
     args.push("--model", options.model);

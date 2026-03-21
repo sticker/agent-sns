@@ -57,19 +57,25 @@ const MAX_QUALITY_RETRIES = 2;
 // --- 厳格レビュアーのシステムプロンプト ---
 
 const REVIEWER_SYSTEM_PROMPT = `あなたは厳格なSNS投稿の品質審査員です。
+生活の知恵・ライフハック系の投稿を審査します。
 採点は厳しく、7.0以上は全体の60%以下にしてください。甘い採点は絶対にしないでください。
 
 # 採点の10項目（各10点満点）
-1. hookStrength: フックの強さ（スクロールを止める力）
-2. usefulness: 有益性（読者にとっての価値）
-3. specificity: 具体性（抽象論でなく具体的か）
-4. tempo: テンポ感（リズムよく読めるか）
-5. personaMatch: ペルソナ一致度（設定した口調・キャラに合ってるか）
-6. uniqueness: オリジナリティ（ありきたりでないか）
-7. emotionalTrigger: 感情トリガー（驚き・共感・好奇心を刺激するか）
-8. readability: 読みやすさ（改行・文の長さ・構造）
-9. ctaPower: 行動喚起力（いいね・コメント・保存したくなるか）
-10. platformFit: Threads最適化度（Threadsの文化に合ってるか）
+1. hookStrength: フックの強さ（意外性・共感・具体的数字でスクロールを止める力。煽りや大げさな表現は減点）
+2. usefulness: 有益性（読んだ人が「やってみよう」と思える具体的な価値があるか）
+3. specificity: 具体性（商品名・金額・期間・手順など具体的な情報が含まれているか。抽象論は大幅減点）
+4. tempo: テンポ感（リズムよく読めるか。冗長でないか）
+5. personaMatch: ペルソナ一致度（フランクで体験ベース。煽り・上から目線は減点）
+6. uniqueness: オリジナリティ（ありきたりな一般論でないか。自分の体験・視点が入っているか）
+7. emotionalTrigger: 共感力（「わかる〜」「へぇ〜」と思わせる力。恐怖訴求・焦らせる表現は減点）
+8. readability: 読みやすさ（改行・文の長さ・構造が適切か）
+9. ctaPower: 行動喚起力（いいね・コメント・保存したくなるか。自然な問いかけや「試してみて」で終われているか）
+10. platformFit: Threads最適化度（Threadsの文化に合ってるか。長すぎないか）
+
+# 特に厳しく見るポイント
+- 煽り表現（「知らないと損」「ヤバい」「最強」の乱用）→ hookStrength, personaMatch, emotionalTriggerを減点
+- 具体性の欠如（「○○がおすすめ」だけで商品名や理由がない）→ specificity, usefulnessを減点
+- 借り物感（ネットで見た情報をそのまま並べただけで体験の手触りがない）→ uniqueness, personaMatchを減点
 
 # 出力形式
 必ず以下のJSON形式で出力してください。
@@ -85,7 +91,7 @@ const REVIEWER_SYSTEM_PROMPT = `あなたは厳格なSNS投稿の品質審査員
   "ctaPower": 6,
   "platformFit": 7,
   "average": 6.4,
-  "feedback": "改善すべき点の簡潔な説明"
+  "feedback": "【強み】... 【改善点】..."
 }`;
 
 // --- ペルソナ/パターンからシステムプロンプトを動的構築 ---
@@ -103,10 +109,16 @@ function buildWriterSystemPrompt(
     ? (personaData.tone as string[]).join("\n- ")
     : String(personaData.tone ?? "フランクだけど知的");
   const firstPerson = String(personaData.firstPerson ?? "僕");
+  const character = String(personaData.character ?? "");
   const mustFollow = (rules.mustFollow as string[]) ?? [];
   const ngWords = (rules.ngWords as string[]) ?? [];
+  const writingPrinciples = (rules.writingPrinciples as string[]) ?? [];
 
-  // パターン定義をテキスト化
+  // ターゲット情報を抽出
+  const targetAudience = personaData.targetAudience as Record<string, unknown> | undefined;
+  const painPoints = (targetAudience?.painPoints as string[]) ?? [];
+
+  // パターン定義をテキスト化（exampleがあれば含める）
   const patternsObj =
     (patterns as Record<string, Record<string, unknown>>).patterns ?? patterns;
   const patternEntries = Object.entries(patternsObj);
@@ -120,7 +132,8 @@ function buildWriterSystemPrompt(
             const desc = v.description ?? "";
             const structure = v.structure ?? "";
             const maxLen = v.maxLength ?? "";
-            return `- ${key}（${name}）: ${desc}\n  構成: ${structure} / 最大${maxLen}文字`;
+            const example = v.example ? `\n  例:\n  ${String(v.example).split("\n").join("\n  ")}` : "";
+            return `- ${key}（${name}）: ${desc}\n  構成: ${structure} / 最大${maxLen}文字${example}`;
           })
           .join("\n")
       : "（パターン定義なし）";
@@ -135,13 +148,47 @@ function buildWriterSystemPrompt(
       ? ngWords.map((w) => `「${w}」`).join("、")
       : "（未設定）";
 
-  return `あなたはThreadsで圧倒的にバズる投稿を書くプロのライターです。
+  const principlesText =
+    writingPrinciples.length > 0
+      ? writingPrinciples.map((p, i) => `${i + 1}. ${p}`).join("\n")
+      : "";
+
+  const painPointsText =
+    painPoints.length > 0
+      ? painPoints.map((p) => `- ${p}`).join("\n")
+      : "";
+
+  return `あなたはThreadsで生活の知恵を発信するプロのライターです。
+読者に「これ、ちょっとやってみよう」と思わせる投稿を書いてください。
+
+# キャラクター
+${character}
 
 # トーン
 - ${tone}
 
 # 一人称
 ${firstPerson}
+
+# 読者の悩み（これに寄り添って書く）
+${painPointsText}
+
+# 執筆の原則（最も重要）
+${principlesText}
+
+# 高品質な投稿を書くための具体的なテクニック
+1. フックは「意外な事実」「共感あるある」「具体的な数字」のどれかで始める
+   - ○ 「食洗機に変えてから1日30分浮いた。」（具体的な数字）
+   - ○ 「冷凍ご飯がまずいのは、ラップの包み方が原因だった。」（意外な事実）
+   - ○ 「自炊したいけど面倒で結局コンビニ、って人いる？僕もそうだった。」（共感）
+   - × 「知らないとヤバい！○○の真実」（煽り）
+   - × 「全人類やるべき最強ハック」（大げさ）
+2. 本文は「体験→発見→具体的な方法→読後の一言」の流れを意識する
+3. 数字を入れると具体性が格段に上がる（月○円、週○分、○日で、○割の人が）
+4. 商品名・サービス名は実在するものを具体的に書く
+5. 「ちなみに○○はイマイチだった」のようなデメリット情報が信頼感を生む
+6. 末尾はコメントを誘う問いかけ、または「やってみて」の軽い後押しで終える
+7. 過去にSNSでバズった生活の知恵を、自分の体験として「これマジで使える」と紹介するのもOK
 
 # 絶対に守るルール
 ${mustFollowText}
@@ -233,38 +280,28 @@ async function rescorePost(
 # 投稿本文
 ${content}
 
-上記の投稿を10項目で採点し、JSON形式で出力してください。`;
-
-  const qualityJsonSchema = {
-    type: "object",
-    properties: {
-      hookStrength: { type: "number" },
-      usefulness: { type: "number" },
-      specificity: { type: "number" },
-      tempo: { type: "number" },
-      personaMatch: { type: "number" },
-      uniqueness: { type: "number" },
-      emotionalTrigger: { type: "number" },
-      readability: { type: "number" },
-      ctaPower: { type: "number" },
-      platformFit: { type: "number" },
-      average: { type: "number" },
-      feedback: { type: "string" },
-    },
-    required: [
-      "hookStrength", "usefulness", "specificity", "tempo",
-      "personaMatch", "uniqueness", "emotionalTrigger", "readability",
-      "ctaPower", "platformFit", "average", "feedback",
-    ],
-  };
+上記の投稿を10項目で採点し、以下のJSON形式のみを出力してください。JSON以外のテキストは不要です。
+{
+  "hookStrength": 数値,
+  "usefulness": 数値,
+  "specificity": 数値,
+  "tempo": 数値,
+  "personaMatch": 数値,
+  "uniqueness": 数値,
+  "emotionalTrigger": 数値,
+  "readability": 数値,
+  "ctaPower": 数値,
+  "platformFit": 数値,
+  "average": 平均値,
+  "feedback": "【強み】... 【改善点】..."
+}`;
 
   try {
     const score = await callLLMJSON<QualityScore & { feedback?: string }>(
       prompt,
       {
         systemPrompt: REVIEWER_SYSTEM_PROMPT,
-        model: "opus",
-        jsonSchema: qualityJsonSchema,
+        model: "sonnet",
       }
     );
 
@@ -383,7 +420,7 @@ async function main() {
     period: "initial",
     topPatterns: [],
     weakPatterns: [],
-    trendingThemes: ["ai_tools", "prompt_eng"],
+    trendingThemes: ["kitchen_hack", "money_hack"],
     fadingThemes: [],
     recommendations: [
       "全パターンを均等に試す",
@@ -495,8 +532,22 @@ JSON形式で出力してください。`;
       );
 
       const lowItems = getLowScoreItems(qualityScore);
-      const feedbackPrompt = `この投稿は品質スコア${qualityScore.average}で不合格でした。以下を改善して書き直してください:
+      const reviewerFeedback = (qualityScore as QualityScore & { feedback?: string }).feedback ?? "";
+      const feedbackPrompt = `この投稿は品質スコア${qualityScore.average}で不合格でした。
+
+# レビュアーのフィードバック
+${reviewerFeedback}
+
+# 特にスコアが低い項目
 ${lowItems.map((item) => `- ${item.name}: ${item.score}点`).join("\n")}
+
+# 改善のヒント
+${lowItems.some(i => i.name.includes("specificity")) ? "- 具体性が足りない。商品名・金額・期間・手順を追加して。「○○がいい」ではなく「○○の△△モデル（○○円）を3ヶ月使った結果」レベルの具体性を。" : ""}
+${lowItems.some(i => i.name.includes("hookStrength")) ? "- フックが弱い。意外な事実、具体的な数字、共感できるあるあるのどれかで始めて。煽りではなく「へぇ」と思わせる。" : ""}
+${lowItems.some(i => i.name.includes("uniqueness")) ? "- オリジナリティが足りない。「やってみたら○○だった」「○○だと思ってたけど実は△△」のように自分の体験・発見を入れて。" : ""}
+${lowItems.some(i => i.name.includes("emotionalTrigger")) ? "- 共感が弱い。読者の「あるある」な悩みに寄り添ってから解決策を提示して。煽りではなく「わかる〜」を引き出す。" : ""}
+${lowItems.some(i => i.name.includes("personaMatch")) ? "- ペルソナに合っていない。上から目線や煽り口調になっていないか確認。友達に教える温度感で。" : ""}
+${lowItems.some(i => i.name.includes("usefulness")) ? "- 有益性が足りない。読んだ人が「今日からやってみよう」と思える具体的なアクションを入れて。" : ""}
 
 # 元の投稿
 ${p.content}
@@ -504,7 +555,8 @@ ${p.content}
 # パターン: ${p.pattern}
 # テーマ: ${p.theme}
 
-書き直した投稿をJSON形式で出力してください:
+上記のフィードバックを踏まえて、投稿を根本から書き直してください。小手先の修正ではなく、アプローチ自体を変えてOKです。
+JSON形式で出力:
 {
   "content": "書き直した投稿本文（単体で完結する内容）",
   "hook": "1行目",
