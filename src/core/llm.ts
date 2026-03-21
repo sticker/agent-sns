@@ -31,10 +31,12 @@ export async function callLLM(
     "-p",
     prompt,
     "--output-format", "json",
+    "--no-chrome",             // Chrome統合を無効化
+    "--strict-mcp-config",     // --mcp-config未指定時にMCPサーバーを読み込まない
   ];
 
   args.push("--max-turns", String(options.maxTurns ?? 1));
-  args.push("--tools", "");  // ツール使用を無効化し、テキスト応答のみに制限
+  args.push("--tools", "");  // ビルトインツール使用を無効化
 
   if (options.systemPrompt) {
     args.push("--append-system-prompt", options.systemPrompt);
@@ -137,6 +139,8 @@ async function callLLMStructured<T>(
     "-p",
     prompt,
     "--output-format", "json",
+    "--no-chrome",
+    "--strict-mcp-config",
     "--max-turns", String(options.maxTurns ?? 2),
     "--json-schema", JSON.stringify(options.jsonSchema),
   ];
