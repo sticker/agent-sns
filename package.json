@@ -9,10 +9,12 @@
     "agent:post": "bun run src/agents/poster.ts",
     "agent:fetch": "bun run src/agents/fetcher.ts",
     "agent:supervise": "bun run src/agents/supervisor.ts",
+    "agent:buzz": "bun run src/agents/buzz-collector.ts",
     "review": "bun run src/cli/review.ts",
     "status": "bun run src/cli/status.ts",
     "setup-cron": "bun run src/cli/setup-cron.ts",
-    "kill": "bun run src/cli/kill.ts"
+    "kill": "bun run src/cli/kill.ts",
+    "auth": "bun run src/cli/auth.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

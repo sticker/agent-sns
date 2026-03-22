@@ -17,7 +17,7 @@ const ENV_PATH = join(PROJECT_ROOT, ".env");
 
 const APP_ID = process.env.THREADS_APP_ID ?? "";
 const APP_SECRET = process.env.THREADS_APP_SECRET ?? "";
-const REDIRECT_URI = "https://sticker.github.io/agent-sns/callback.html";
+const REDIRECT_URI = "https://sticker.github.io/agent-sns/callback/";
 const SCOPES = [
   "threads_basic",
   "threads_content_publish",

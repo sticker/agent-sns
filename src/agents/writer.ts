@@ -14,6 +14,7 @@
 //   8. 合格投稿を status="draft" で queue.json + posts.json に保存
 // ============================================================
 
+import { join } from "path";
 import { callLLMJSON } from "../core/llm";
 import {
   log,
@@ -24,6 +25,8 @@ import {
   loadResearch,
   loadInsights,
   loadPersona,
+  loadJSON,
+  DATA_DIR,
   loadPatterns,
   loadConfig,
   saveJSON,
@@ -96,9 +99,18 @@ const REVIEWER_SYSTEM_PROMPT = `あなたは厳格なSNS投稿の品質審査員
 
 // --- ペルソナ/パターンからシステムプロンプトを動的構築 ---
 
+interface ToneAnalysis {
+  toneFeatures: string[];
+  hookPatterns: string[];
+  expressions: string[];
+  rhythmNotes: string[];
+  examplePosts: string[];
+}
+
 function buildWriterSystemPrompt(
   persona: Record<string, unknown>,
-  patterns: Record<string, unknown>
+  patterns: Record<string, unknown>,
+  toneAnalysis?: ToneAnalysis | null
 ): string {
   // ペルソナ情報を安全に抽出
   const personaData =
@@ -218,7 +230,25 @@ ${patternText}
 ## contentとthreadPartsの違い（重要）
 - content: メインの投稿本文。これだけで完結する内容にすること
 - threadParts: contentに対するスレッド返信として追加する補足情報。contentの内容を繰り返さず、具体例・データ・裏話・参考リンクなど付加価値のある情報を書く。不要なら空配列[]でよい
-- contentの内容をthreadPartsに分割コピーするのは絶対にNG`;
+- contentの内容をthreadPartsに分割コピーするのは絶対にNG
+${toneAnalysis ? `
+# バズ投稿から学んだ口調・テンポ（これを真似して書くこと）
+
+## 口調の特徴
+${toneAnalysis.toneFeatures.map((f) => `- ${f}`).join("\n")}
+
+## フックの型（冒頭の書き出しパターン）
+${toneAnalysis.hookPatterns.map((p) => `- ${p}`).join("\n")}
+
+## よく使われる表現・フレーズ
+${toneAnalysis.expressions.map((e) => `- ${e}`).join("\n")}
+
+## 文のリズム・テンポ
+${toneAnalysis.rhythmNotes.map((r) => `- ${r}`).join("\n")}
+
+## お手本投稿（この雰囲気・テンポを参考にすること）
+${toneAnalysis.examplePosts.map((p, i) => `--- 例${i + 1} ---\n${p}`).join("\n\n")}
+` : ""}`;
 }
 
 // --- 日本語対応の類似度チェック（Jaccard係数 + n-gram + Intl.Segmenter） ---
@@ -448,7 +478,16 @@ async function main() {
     .slice(0, 15);
 
   // システムプロンプトを動的構築
-  const writerSystemPrompt = buildWriterSystemPrompt(persona, patterns);
+  // 口調分析ファイルがあれば読み込む
+  const toneAnalysis = loadJSON<ToneAnalysis | null>(
+    join(DATA_DIR, "tone_analysis.json"),
+    null
+  );
+  if (toneAnalysis) {
+    log(`口調分析データを注入（お手本${toneAnalysis.examplePosts?.length ?? 0}件）`);
+  }
+
+  const writerSystemPrompt = buildWriterSystemPrompt(persona, patterns, toneAnalysis);
 
   // 生成プロンプト
   const userPrompt = `以下の情報を元に${batchSize}本の投稿を生成してください。
